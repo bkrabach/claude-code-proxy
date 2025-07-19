@@ -13,6 +13,7 @@ A proxy server that lets you use Anthropic clients with Gemini or OpenAI models 
 
 - OpenAI API key 🔑
 - Google AI Studio (Gemini) API key (if using Google provider) 🔑
+- Azure OpenAI credentials or Managed Identity (if using Azure) 🔑
 - [uv](https://github.com/astral-sh/uv) installed.
 
 ### Setup 🛠️
@@ -39,6 +40,8 @@ A proxy server that lets you use Anthropic clients with Gemini or OpenAI models 
    *   `ANTHROPIC_API_KEY`: (Optional) Needed only if proxying *to* Anthropic models.
    *   `OPENAI_API_KEY`: Your OpenAI API key (Required if using the default OpenAI preference or as fallback).
    *   `GEMINI_API_KEY`: Your Google AI Studio (Gemini) API key (Required if PREFERRED_PROVIDER=google).
+   *   `AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_API_VERSION`: Endpoint and API version for Azure OpenAI (optional).
+   *   `AZURE_OPENAI_API_KEY`: Azure API key. Leave unset to use Managed Identity.
    *   `PREFERRED_PROVIDER` (Optional): Set to `openai` (default) or `google`. This determines the primary backend for mapping `haiku`/`sonnet`.
    *   `BIG_MODEL` (Optional): The model to map `sonnet` requests to. Defaults to `gpt-4.1` (if `PREFERRED_PROVIDER=openai`) or `gemini-2.5-pro-preview-03-25`.
    *   `SMALL_MODEL` (Optional): The model to map `haiku` requests to. Defaults to `gpt-4.1-mini` (if `PREFERRED_PROVIDER=openai`) or `gemini-2.0-flash`.
@@ -100,8 +103,9 @@ The following Gemini models are supported with automatic `gemini/` prefix handli
 
 ### Model Prefix Handling
 The proxy automatically adds the appropriate prefix to model names:
-- OpenAI models get the `openai/` prefix 
+- OpenAI models get the `openai/` prefix
 - Gemini models get the `gemini/` prefix
+- Azure deployments use the `azure/` prefix
 - The BIG_MODEL and SMALL_MODEL will get the appropriate prefix based on whether they're in the OpenAI or Gemini model lists
 
 For example:
@@ -139,6 +143,13 @@ GEMINI_API_KEY="your-google-key"
 PREFERRED_PROVIDER="openai"
 BIG_MODEL="gpt-4o" # Example specific model
 SMALL_MODEL="gpt-4o-mini" # Example specific model
+```
+
+**Example 4: Azure OpenAI with Managed Identity**
+```dotenv
+AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+AZURE_OPENAI_API_VERSION="2024-02-15-preview"
+# AZURE_OPENAI_API_KEY=""  # optional, omit for Managed Identity
 ```
 
 ## How It Works 🧩

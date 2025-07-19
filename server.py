@@ -11,6 +11,7 @@ import litellm
 import uuid
 import time
 from dotenv import load_dotenv
+from azure.identity import DefaultAzureCredential
 import re
 from datetime import datetime
 import sys
@@ -81,6 +82,9 @@ app = FastAPI()
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION")
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
 
 # Get preferred provider (default to openai)
 PREFERRED_PROVIDER = os.environ.get("PREFERRED_PROVIDER", "openai").lower()
@@ -236,10 +240,10 @@ class MessagesRequest(BaseModel):
         if mapped:
             logger.debug(f"📌 MODEL MAPPING: '{original_model}' ➡️ '{new_model}'")
         else:
-             # If no mapping occurred and no prefix exists, log warning or decide default
-             if not v.startswith(('openai/', 'gemini/', 'anthropic/')):
-                 logger.warning(f"⚠️ No prefix or mapping rule for model: '{original_model}'. Using as is.")
-             new_model = v # Ensure we return the original if no rule applied
+            # If no mapping occurred and no prefix exists, log warning or decide default
+            if not v.startswith(('openai/', 'gemini/', 'anthropic/', 'azure/')):
+                logger.warning(f"⚠️ No prefix or mapping rule for model: '{original_model}'. Using as is.")
+            new_model = v  # Ensure we return the original if no rule applied
 
         # Store the original model in the values dictionary
         values = info.data
@@ -309,9 +313,9 @@ class TokenCountRequest(BaseModel):
         if mapped:
             logger.debug(f"📌 TOKEN COUNT MAPPING: '{original_model}' ➡️ '{new_model}'")
         else:
-             if not v.startswith(('openai/', 'gemini/', 'anthropic/')):
-                 logger.warning(f"⚠️ No prefix or mapping rule for token count model: '{original_model}'. Using as is.")
-             new_model = v # Ensure we return the original if no rule applied
+            if not v.startswith(('openai/', 'gemini/', 'anthropic/', 'azure/')):
+                logger.warning(f"⚠️ No prefix or mapping rule for token count model: '{original_model}'. Using as is.")
+            new_model = v  # Ensure we return the original if no rule applied
 
         # Store the original model in the values dictionary
         values = info.data
@@ -533,7 +537,7 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
     
     # Cap max_tokens for OpenAI models to their limit of 16384
     max_tokens = anthropic_request.max_tokens
-    if anthropic_request.model.startswith("openai/") or anthropic_request.model.startswith("gemini/"):
+    if anthropic_request.model.startswith("openai/") or anthropic_request.model.startswith("gemini/") or anthropic_request.model.startswith("azure/"):
         max_tokens = min(max_tokens, 16384)
         logger.debug(f"Capping max_tokens to 16384 for OpenAI/Gemini model (original value: {anthropic_request.max_tokens})")
     
@@ -628,6 +632,8 @@ def convert_litellm_to_anthropic(litellm_response: Union[Dict[str, Any], Any],
             clean_model = clean_model[len("anthropic/"):]
         elif clean_model.startswith("openai/"):
             clean_model = clean_model[len("openai/"):]
+        elif clean_model.startswith("azure/"):
+            clean_model = clean_model[len("azure/"):]
         
         # Check if this is a Claude model (which supports content blocks)
         is_claude_model = clean_model.startswith("claude-")
@@ -1097,6 +1103,8 @@ async def create_message(
             clean_model = clean_model[len("anthropic/"):]
         elif clean_model.startswith("openai/"):
             clean_model = clean_model[len("openai/"):]
+        elif clean_model.startswith("azure/"):
+            clean_model = clean_model[len("azure/"):]
         
         logger.debug(f"📊 PROCESSING REQUEST: Model={request.model}, Stream={request.stream}")
         
@@ -1107,6 +1115,18 @@ async def create_message(
         if request.model.startswith("openai/"):
             litellm_request["api_key"] = OPENAI_API_KEY
             logger.debug(f"Using OpenAI API key for model: {request.model}")
+        elif request.model.startswith("azure/"):
+            litellm_request["api_key"] = AZURE_OPENAI_API_KEY
+            litellm_request["azure_endpoint"] = AZURE_OPENAI_ENDPOINT
+            litellm_request["api_version"] = AZURE_OPENAI_API_VERSION
+            litellm_request["custom_llm_provider"] = "azure"
+            if AZURE_OPENAI_API_KEY is None and AZURE_OPENAI_ENDPOINT:
+                cred = DefaultAzureCredential()
+                token = cred.get_token("https://cognitiveservices.azure.com/.default")
+                litellm_request["azure_ad_token"] = token.token
+            # model name for litellm is deployment name
+            litellm_request["model"] = request.model.split("/", 1)[1]
+            logger.debug(f"Using Azure OpenAI for model: {request.model}")
         elif request.model.startswith("gemini/"):
             litellm_request["api_key"] = GEMINI_API_KEY
             logger.debug(f"Using Gemini API key for model: {request.model}")
@@ -1114,8 +1134,8 @@ async def create_message(
             litellm_request["api_key"] = ANTHROPIC_API_KEY
             logger.debug(f"Using Anthropic API key for model: {request.model}")
         
-        # For OpenAI models - modify request format to work with limitations
-        if "openai" in litellm_request["model"] and "messages" in litellm_request:
+        # For OpenAI or Azure models - modify request format to work with limitations
+        if ("openai" in litellm_request["model"] or litellm_request.get("custom_llm_provider") == "azure") and "messages" in litellm_request:
             logger.debug(f"Processing OpenAI model request: {litellm_request['model']}")
             
             # For OpenAI models, we need to convert content blocks to simple strings
