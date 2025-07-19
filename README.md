@@ -39,6 +39,7 @@ A proxy server that lets you use Anthropic clients with Gemini or OpenAI models 
    *   `ANTHROPIC_API_KEY`: (Optional) Needed only if proxying *to* Anthropic models.
    *   `OPENAI_API_KEY`: Your OpenAI API key (Required if using the default OpenAI preference or as fallback).
    *   `GEMINI_API_KEY`: Your Google AI Studio (Gemini) API key (Required if PREFERRED_PROVIDER=google).
+   *   `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_API_KEY`: Azure endpoint and API key (leave key empty to use Managed Identity).
    *   `PREFERRED_PROVIDER` (Optional): Set to `openai` (default) or `google`. This determines the primary backend for mapping `haiku`/`sonnet`.
    *   `BIG_MODEL` (Optional): The model to map `sonnet` requests to. Defaults to `gpt-4.1` (if `PREFERRED_PROVIDER=openai`) or `gemini-2.5-pro-preview-03-25`.
    *   `SMALL_MODEL` (Optional): The model to map `haiku` requests to. Defaults to `gpt-4.1-mini` (if `PREFERRED_PROVIDER=openai`) or `gemini-2.0-flash`.
@@ -139,6 +140,15 @@ GEMINI_API_KEY="your-google-key"
 PREFERRED_PROVIDER="openai"
 BIG_MODEL="gpt-4o" # Example specific model
 SMALL_MODEL="gpt-4o-mini" # Example specific model
+```
+
+**Example 4: Azure with Managed Identity**
+```dotenv
+AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
+# AZURE_OPENAI_API_KEY="" # Omit to use Managed Identity
+PREFERRED_PROVIDER="azure"
+BIG_MODEL="my-azure-deployment-big"
+SMALL_MODEL="my-azure-deployment-small"
 ```
 
 ## How It Works 🧩

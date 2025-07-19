@@ -81,6 +81,11 @@ app = FastAPI()
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# Azure OpenAI optional configuration
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
+AZURE_API_VERSION = os.environ.get("AZURE_API_VERSION")
+AZURE_DEPLOYMENT_NAME = os.environ.get("AZURE_DEPLOYMENT_NAME")
 
 # Get preferred provider (default to openai)
 PREFERRED_PROVIDER = os.environ.get("PREFERRED_PROVIDER", "openai").lower()
@@ -111,6 +116,9 @@ GEMINI_MODELS = [
     "gemini-2.5-pro-preview-03-25",
     "gemini-2.0-flash"
 ]
+
+# Azure deployment names can vary, so this is just a placeholder list
+AZURE_MODELS = []
 
 # Helper function to clean schema for Gemini
 def clean_gemini_schema(schema: Any) -> Any:
@@ -210,6 +218,9 @@ class MessagesRequest(BaseModel):
             if PREFERRED_PROVIDER == "google" and SMALL_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{SMALL_MODEL}"
                 mapped = True
+            elif PREFERRED_PROVIDER == "azure" and SMALL_MODEL:
+                new_model = f"azure/{SMALL_MODEL}"
+                mapped = True
             else:
                 new_model = f"openai/{SMALL_MODEL}"
                 mapped = True
@@ -218,6 +229,9 @@ class MessagesRequest(BaseModel):
         elif 'sonnet' in clean_v.lower():
             if PREFERRED_PROVIDER == "google" and BIG_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "azure" and BIG_MODEL:
+                new_model = f"azure/{BIG_MODEL}"
                 mapped = True
             else:
                 new_model = f"openai/{BIG_MODEL}"
@@ -231,6 +245,9 @@ class MessagesRequest(BaseModel):
             elif clean_v in OPENAI_MODELS and not v.startswith('openai/'):
                 new_model = f"openai/{clean_v}"
                 mapped = True # Technically mapped to add prefix
+            elif clean_v in AZURE_MODELS and not v.startswith('azure/'):
+                new_model = f"azure/{clean_v}"
+                mapped = True
         # --- Mapping Logic --- END ---
 
         if mapped:
@@ -283,6 +300,9 @@ class TokenCountRequest(BaseModel):
             if PREFERRED_PROVIDER == "google" and SMALL_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{SMALL_MODEL}"
                 mapped = True
+            elif PREFERRED_PROVIDER == "azure" and SMALL_MODEL:
+                new_model = f"azure/{SMALL_MODEL}"
+                mapped = True
             else:
                 new_model = f"openai/{SMALL_MODEL}"
                 mapped = True
@@ -291,6 +311,9 @@ class TokenCountRequest(BaseModel):
         elif 'sonnet' in clean_v.lower():
             if PREFERRED_PROVIDER == "google" and BIG_MODEL in GEMINI_MODELS:
                 new_model = f"gemini/{BIG_MODEL}"
+                mapped = True
+            elif PREFERRED_PROVIDER == "azure" and BIG_MODEL:
+                new_model = f"azure/{BIG_MODEL}"
                 mapped = True
             else:
                 new_model = f"openai/{BIG_MODEL}"
@@ -304,6 +327,9 @@ class TokenCountRequest(BaseModel):
             elif clean_v in OPENAI_MODELS and not v.startswith('openai/'):
                 new_model = f"openai/{clean_v}"
                 mapped = True # Technically mapped to add prefix
+            elif clean_v in AZURE_MODELS and not v.startswith('azure/'):
+                new_model = f"azure/{clean_v}"
+                mapped = True
         # --- Mapping Logic --- END ---
 
         if mapped:
@@ -555,7 +581,28 @@ def convert_anthropic_to_litellm(anthropic_request: MessagesRequest) -> Dict[str
     
     if anthropic_request.top_k:
         litellm_request["top_k"] = anthropic_request.top_k
-    
+
+    # Azure OpenAI configuration if model starts with azure/
+    if anthropic_request.model.startswith("azure/"):
+        litellm_request["model"] = anthropic_request.model[len("azure/") :]
+        if AZURE_OPENAI_API_KEY:
+            litellm_request["api_key"] = AZURE_OPENAI_API_KEY
+        else:
+            try:
+                from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+                token_provider = get_bearer_token_provider(
+                    DefaultAzureCredential(),
+                    "https://cognitiveservices.azure.com/.default",
+                )
+                litellm_request["azure_ad_token_provider"] = token_provider
+            except Exception as e:
+                logger.error(f"Azure credential error: {e}")
+        if AZURE_OPENAI_ENDPOINT:
+            litellm_request["api_base"] = AZURE_OPENAI_ENDPOINT
+        if AZURE_API_VERSION:
+            litellm_request["api_version"] = AZURE_API_VERSION
+
     # Convert tools to OpenAI format
     if anthropic_request.tools:
         openai_tools = []
