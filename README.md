@@ -12,6 +12,7 @@ A proxy server that lets you use Anthropic clients with Gemini or OpenAI models 
 ### Prerequisites
 
 - OpenAI API key 🔑
+- Azure OpenAI credentials (API key or Managed Identity) 🔑
 - Google AI Studio (Gemini) API key (if using Google provider) 🔑
 - [uv](https://github.com/astral-sh/uv) installed.
 
@@ -38,14 +39,18 @@ A proxy server that lets you use Anthropic clients with Gemini or OpenAI models 
 
    *   `ANTHROPIC_API_KEY`: (Optional) Needed only if proxying *to* Anthropic models.
    *   `OPENAI_API_KEY`: Your OpenAI API key (Required if using the default OpenAI preference or as fallback).
+   *   `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint when using `azure/` models.
+   *   `AZURE_OPENAI_API_KEY`: API key for Azure OpenAI (optional if using Managed Identity).
+   *   `AZURE_USE_MANAGED_IDENTITY`: Set to `true` to authenticate with Managed Identity.
    *   `GEMINI_API_KEY`: Your Google AI Studio (Gemini) API key (Required if PREFERRED_PROVIDER=google).
-   *   `PREFERRED_PROVIDER` (Optional): Set to `openai` (default) or `google`. This determines the primary backend for mapping `haiku`/`sonnet`.
+   *   `PREFERRED_PROVIDER` (Optional): Set to `openai` (default), `google`, or `azure`. This determines the primary backend for mapping `haiku`/`sonnet`.
    *   `BIG_MODEL` (Optional): The model to map `sonnet` requests to. Defaults to `gpt-4.1` (if `PREFERRED_PROVIDER=openai`) or `gemini-2.5-pro-preview-03-25`.
    *   `SMALL_MODEL` (Optional): The model to map `haiku` requests to. Defaults to `gpt-4.1-mini` (if `PREFERRED_PROVIDER=openai`) or `gemini-2.0-flash`.
 
    **Mapping Logic:**
    - If `PREFERRED_PROVIDER=openai` (default), `haiku`/`sonnet` map to `SMALL_MODEL`/`BIG_MODEL` prefixed with `openai/`.
    - If `PREFERRED_PROVIDER=google`, `haiku`/`sonnet` map to `SMALL_MODEL`/`BIG_MODEL` prefixed with `gemini/` *if* those models are in the server's known `GEMINI_MODELS` list (otherwise falls back to OpenAI mapping).
+   - If `PREFERRED_PROVIDER=azure`, `haiku`/`sonnet` map to `SMALL_MODEL`/`BIG_MODEL` prefixed with `azure/`.
 
 4. **Run the server**:
    ```bash
@@ -139,6 +144,15 @@ GEMINI_API_KEY="your-google-key"
 PREFERRED_PROVIDER="openai"
 BIG_MODEL="gpt-4o" # Example specific model
 SMALL_MODEL="gpt-4o-mini" # Example specific model
+```
+
+**Example 4: Use Azure OpenAI**
+```dotenv
+AZURE_OPENAI_ENDPOINT="https://my-resource.openai.azure.com"
+AZURE_OPENAI_API_KEY="my-azure-key"
+PREFERRED_PROVIDER="azure"
+BIG_MODEL="gpt-4"
+SMALL_MODEL="gpt-4"
 ```
 
 ## How It Works 🧩
