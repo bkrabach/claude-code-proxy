@@ -147,6 +147,15 @@ TEST_SCENARIOS = {
         "tools": [calculator_tool],
         "tool_choice": {"type": "auto"}
     },
+
+    # Azure simple test if configured
+    "azure_simple": {
+        "model": f"azure/{os.environ.get('AZURE_DEPLOYMENT_NAME','')}",
+        "max_tokens": 100,
+        "messages": [
+            {"role": "user", "content": "Hello from Azure?"}
+        ]
+    } if os.environ.get("AZURE_OPENAI_ENDPOINT") else None,
     
     # Content blocks
     "content_blocks": {
@@ -640,6 +649,8 @@ async def run_tests(args):
     if not args.streaming_only:
         print("\n\n=========== RUNNING NON-STREAMING TESTS ===========\n")
         for test_name, test_data in TEST_SCENARIOS.items():
+            if not test_data:
+                continue
             # Skip streaming tests
             if test_data.get("stream"):
                 continue
@@ -661,6 +672,8 @@ async def run_tests(args):
     if not args.no_streaming:
         print("\n\n=========== RUNNING STREAMING TESTS ===========\n")
         for test_name, test_data in TEST_SCENARIOS.items():
+            if not test_data:
+                continue
             # Only select streaming tests, or force streaming
             if not test_data.get("stream") and not test_name.endswith("_stream"):
                 continue
